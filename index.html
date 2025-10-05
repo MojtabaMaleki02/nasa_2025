@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Exoplanet Hunter - Citizen Science</title>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { margin: 0; padding: 0; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    // Lucide icons as inline SVG components
+    const MessageSquare = ({size = 24, className = ''}) => (
+      <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+      </svg>
+    );
+    const Settings = ({size = 24, className = ''}) => (
+      <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 6v6m5.2-13.8l-4.2 4.2m0 5.2l4.2 4.2M23 12h-6m-6 0H1m18.8-5.2l-4.2 4.2m0 5.2l4.2 4.2"/>
+      </svg>
+    );
+    const Download = ({size = 24, className = ''}) => (
+      <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4m4-5l5 5 5-5m-5 5V3"/>
+      </svg>
+    );
+    const X = ({size = 24, className = ''}) => (
+      <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+      </svg>
+    );
+    const Check = ({size = 24, className = ''}) => (
+      <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <polyline points="20 6 9 17 4 12"/>
+      </svg>
+    );
+    const TrendingUp = ({size = 24, className = ''}) => (
+      <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/>
+      </svg>
+    );
+    const Sparkles = ({size = 24, className = ''}) => (
+      <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/><path d="M20 3v4m-2-2h4"/>
+      </svg>
+    );
+    const Brain = ({size = 24, className = ''}) => (
+      <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.98-3A2.5 2.5 0 0 1 9.5 2Z"/><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.98-3A2.5 2.5 0 0 0 14.5 2Z"/>
+      </svg>
+    );
+    const Database = ({size = 24, className = ''}) => (
+      <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"/>
+      </svg>
+    );
+
+    // ==================== DATA & SIMULATION ====================
+
+    const LABEL_OPTIONS = [
+      { value: 'planet_candidate', label: 'Planet Candidate', color: 'bg-blue-500' },
+      { value: 'eclipsing_binary', label: 'Eclipsing Binary', color: 'bg-purple-500' },
+      { value: 'stellar_variability', label: 'Stellar Variability', color: 'bg-orange-500' },
+      { value: 'instrument_artifact', label: 'Instrument Artifact', color: 'bg-red-500' }
+    ];
+
+    const hashCode = (str) => {
+      let hash = 0;
+      for (let i = 0; i < str.length; i++) {
+        const char = str.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash;
+      }
+      return Math.abs(hash);
+    };
+
+    const seededRandom = (seed) => {
+      const x = Math.sin(seed) * 10000;
+      return x - Math.floor(x);
+    };
+
+    const generateMLPrediction = (item) => {
+      const seed = hashCode(item.id);
+      const labelIndex = Math.floor(seededRandom(seed) * LABEL_OPTIONS.length);
+      const confidence = 0.55 + seededRandom(seed + 1) * 0.40;
+      
+      const prediction = LABEL_OPTIONS[labelIndex].value;
+      const explanation = generateMLExplanation(item.metadata, prediction, confidence);
+      
+      return { prediction, confidence, explanation };
+    };
+
+    const generateMLExplanation = (metadata, label, confidence) => {
+      const { shape, depth_fraction, duration_hours, snr } = metadata;
+      const depthPct = (depth_fraction * 100).toFixed(1);
+      
+      const templates = {
+        planet_candidate: `U-shaped dips with moderate depth (${depthPct}%) and good SNR (${snr.toFixed(1)}) suggest planetary transit`,
+        eclipsing_binary: `V-shaped, deep dips (${depthPct}%) and duration ${duration_hours.toFixed(1)}h indicate eclipsing binary`,
+        stellar_variability: `Irregular pattern with SNR ${snr.toFixed(1)} suggests intrinsic stellar variability`,
+        instrument_artifact: `Low SNR (${snr.toFixed(1)}) and irregular shape indicate potential instrumental noise`
+      };
+      
+      return templates[label] || `Pattern analysis suggests ${label}`;
+    };
+
+    const generateEducationalFeedback = (item, userLabel, correctLabel) => {
+      const { shape, depth_fraction, duration_hours, snr } = item.metadata;
+      const depthPct = (depth_fraction * 100).toFixed(1);
+      
+      const explanations = {
+        planet_candidate: `This light curve shows a ${shape} dip of ${depthPct}% lasting ${duration_hours.toFixed(1)}h with SNR ${snr.toFixed(1)} — these characteristics (moderate depth, U-shape, good SNR) are classic signatures of a planetary transit.`,
+        eclipsing_binary: `The ${shape} dip of ${depthPct}% lasting ${duration_hours.toFixed(1)}h indicates an eclipsing binary — the V-shape and larger depth are typical of stellar eclipses rather than planetary transits.`,
+        stellar_variability: `With SNR ${snr.toFixed(1)} and ${shape} pattern, this shows stellar variability — the irregular or periodic brightness changes are from the star itself, not an orbiting object.`,
+        instrument_artifact: `The low SNR (${snr.toFixed(1)}) and ${shape} pattern suggest instrumental noise rather than astrophysical signals — real transits typically have clearer, repeatable signatures.`
+      };
+      
+      return explanations[correctLabel] || `This is classified as ${correctLabel} based on the signal characteristics.`;
+    };
+
+    const generateChatResponse = (item, userLabel, mlPrediction, conversationHistory) => {
+      const { shape, depth_fraction, duration_hours, snr, period_days } = item.metadata;
+      const depthPct = (depth_fraction * 100).toFixed(1);
+      
+      if (conversationHistory.length === 0) {
+        const mostLikely = mlPrediction?.prediction || item.label;
+        return `Thanks for raising this — let's look closer. The light curve shows ${shape} dips with depth ${depthPct}% and SNR ${snr.toFixed(1)}. ${period_days ? `The period is ${period_days.toFixed(2)} days. ` : ''}These properties suggest **${mostLikely}**: ${generateMLExplanation(item.metadata, mostLikely, mlPrediction?.confidence || 0.9)}.\n\nCould you tell me what features led you to choose **${userLabel}**? We can compare the evidence together.`;
+      }
+      
+      const responses = [
+        `That's a thoughtful observation. The ${shape} shape is indeed important. However, the depth of ${depthPct}% combined with duration ${duration_hours.toFixed(1)}h is more consistent with the characteristics we typically see in confirmed cases. What do you think about the SNR of ${snr.toFixed(1)}?`,
+        `I see your reasoning. The period ${period_days ? `of ${period_days.toFixed(2)} days` : 'analysis'} and the signal-to-noise ratio are key factors here. Have you considered how the ${shape} shape relates to the depth and duration measurements?`,
+        `Good question! When we compare this to thousands of confirmed cases, the combination of ${shape} dips, ${depthPct}% depth, and ${duration_hours.toFixed(1)}h duration creates a signature pattern. Would you like to review the classification, or do you still prefer your original choice?`
+      ];
+      
+      const index = Math.min(conversationHistory.length - 1, responses.length - 1);
+      return responses[index];
+    };
+
+    const generateSampleData = () => {
+      const nasaData = [
+        { id: 'nasa-001', kepoi: 'K00752.01', label: 'planet_candidate', period: 9.488, depth: 0.006158, duration: 2.95750, snr: 35.80, shape: 'u-shaped' },
+        { id: 'nasa-002', kepoi: 'K00752.02', label: 'planet_candidate', period: 54.418, depth: 0.008748, duration: 4.50700, snr: 25.80, shape: 'u-shaped' },
+        { id: 'nasa-003', kepoi: 'K00753.01', label: 'instrument_artifact', period: 19.899, depth: 0.010829, duration: 1.78220, snr: 76.30, shape: 'irregular' },
+        { id: 'nasa-004', kepoi: 'K00754.01', label: 'eclipsing_binary', period: 1.737, depth: 0.080792, duration: 2.40641, snr: 505.60, shape: 'v-shaped' },
+        { id: 'nasa-005', kepoi: 'K00755.01', label: 'planet_candidate', period: 2.526, depth: 0.006033, duration: 1.65450, snr: 40.90, shape: 'u-shaped' },
+        { id: 'nasa-006', kepoi: 'K00756.01', label: 'planet_candidate', period: 11.094, depth: 0.015175, duration: 4.59450, snr: 66.50, shape: 'u-shaped' },
+        { id: 'nasa-007', kepoi: 'K00756.02', label: 'planet_candidate', period: 4.134, depth: 0.006860, duration: 3.14020, snr: 40.20, shape: 'u-shaped' },
+        { id: 'nasa-008', kepoi: 'K00756.03', label: 'planet_candidate', period: 2.567, depth: 0.002265, duration: 2.42900, snr: 15.00, shape: 'u-shaped' },
+        { id: 'nasa-009', kepoi: 'K00114.01', label: 'stellar_variability', period: 7.362, depth: 0.002337, duration: 5.02200, snr: 47.70, shape: 'irregular' },
+        { id: 'nasa-010', kepoi: 'K00757.01', label: 'planet_candidate', period: 16.069, depth: 0.049143, duration: 3.53470, snr: 161.90, shape: 'u-shaped' }
+      ];
+      
+      const rawData = [
+        { id: 'raw-001', period: null, depth: 0.025, duration: 1.8, snr: 8.2, shape: 'v-shaped' },
+        { id: 'raw-002', period: null, depth: 0.008, duration: 3.5, snr: 22.5, shape: 'u-shaped' },
+        { id: 'raw-003', period: null, depth: 0.012, duration: 2.1, snr: 6.8, shape: 'irregular' },
+        { id: 'raw-004', period: null, depth: 0.045, duration: 2.8, snr: 95.2, shape: 'v-shaped' },
+        { id: 'raw-005', period: null, depth: 0.003, duration: 4.2, snr: 12.1, shape: 'u-shaped' }
+      ];
+      
+      const convertToItem = (d, isNasa) => ({
+        id: d.id,
+        source: isNasa ? 'NASA' : 'raw',
+        metadata: {
+          period_days: d.period,
+          depth_fraction: d.depth,
+          duration_hours: d.duration,
+          snr: d.snr,
+          shape: d.shape,
+          kepoi_name: d.kepoi
+        },
+        label: isNasa ? d.label : null,
+        flux: generateFluxData(d.depth, d.period || 10, d.shape)
+      });
+      
+      return [
+        ...nasaData.map(d => convertToItem(d, true)),
+        ...rawData.map(d => convertToItem(d, false))
+      ];
+    };
+
+    const generateFluxData = (depth, period, shape) => {
+      const points = 100;
+      const data = [];
+      
+      for (let i = 0; i < points; i++) {
+        const phase = (i / points) * period;
+        let flux = 1.0;
+        
+        const transitStart = 0.3;
+        const transitEnd = 0.35;
+        
+        if (phase >= transitStart && phase <= transitEnd) {
+          const transitPhase = (phase - transitStart) / (transitEnd - transitStart);
+          
+          if (shape === 'u-shaped') {
+            flux = 1.0 - depth * Math.sin(transitPhase * Math.PI);
+          } else if (shape === 'v-shaped') {
+            flux = 1.0 - depth * (1 - Math.abs(transitPhase * 2 - 1));
+          } else {
+            flux = 1.0 - depth * (0.5 + 0.5 * Math.random());
+          }
+        }
+        
+        flux += (Math.random() - 0.5) * 0.002;
+        data.push({ time: phase, flux });
+      }
+      
+      return data;
+    };
+
+    // ==================== COMPONENTS ====================
+
+    const LightCurveChart = ({ data, className = '' }) => {
+      const width = 200;
+      const height = 80;
+      const padding = 10;
+      
+      if (!data || data.length === 0) return null;
+      
+      const xMin = Math.min(...data.map(d => d.time));
+      const xMax = Math.max(...data.map(d => d.time));
+      const yMin = Math.min(...data.map(d => d.flux));
+      const yMax = Math.max(...data.map(d => d.flux));
+      
+      const xScale = (x) => padding + ((x - xMin) / (xMax - xMin)) * (width - 2 * padding);
+      const yScale = (y) => height - padding - ((y - yMin) / (yMax - yMin)) * (height - 2 * padding);
+      
+      const points = data.map(d => `${xScale(d.time)},${yScale(d.flux)}`).join(' ');
+      
+      return (
+        <svg width={width} height={height} className={className}>
+          <rect width={width} height={height} fill="#1e293b" rx="4" />
+          <polyline points={points} fill="none" stroke="#3b82f6" strokeWidth="1.5" />
+          <line x1={padding} y1={height/2} x2={width-padding} y2={height/2} stroke="#475569" strokeWidth="1" strokeDasharray="2,2" />
+        </svg>
+      );
+    };
+
+    const ItemCard = ({ item, onLabel, onChat, userLabel, mlPrediction, showResult, isLabeled }) => {
+      const userLabelObj = userLabel ? LABEL_OPTIONS.find(o => o.value === userLabel) : null;
+      const mlLabel = mlPrediction ? LABEL_OPTIONS.find(o => o.value === mlPrediction.prediction) : null;
+      const groundTruthLabel = item.label ? LABEL_OPTIONS.find(o => o.value === item.label) : null;
+      
+      return (
+        <div className="bg-slate-800 rounded-lg p-4 shadow-lg border border-slate-700">
+          <div className="flex justify-between items-start mb-3">
+            <div>
+              <div className="text-sm text-slate-400">ID: {item.id}</div>
+              {isLabeled && (
+                <div className="text-xs text-slate-500 mt-1">
+                  {item.source === 'NASA' ? (
+                    <span className="inline-flex items-center gap-1 bg-blue-900/30 px-2 py-0.5 rounded">
+                      <Database size={12} />
+                      NASA Catalog
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 bg-purple-900/30 px-2 py-0.5 rounded">
+                      <Brain size={12} />
+                      Raw Data
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+            {!isLabeled && (
+              <div className="text-xs bg-slate-700 px-2 py-1 rounded text-slate-300">Unlabeled</div>
+            )}
+          </div>
+          
+          <LightCurveChart data={item.flux} className="mb-3" />
+          
+          <div className="grid grid-cols-2 gap-2 text-xs mb-3">
+            <div><span className="text-slate-400">Period:</span> {item.metadata.period_days ? `${item.metadata.period_days.toFixed(2)}d` : 'Unknown'}</div>
+            <div><span className="text-slate-400">Depth:</span> {(item.metadata.depth_fraction * 100).toFixed(2)}%</div>
+            <div><span className="text-slate-400">Duration:</span> {item.metadata.duration_hours.toFixed(1)}h</div>
+            <div><span className="text-slate-400">SNR:</span> {item.metadata.snr.toFixed(1)}</div>
+            <div className="col-span-2"><span className="text-slate-400">Shape:</span> {item.metadata.shape}</div>
+          </div>
+          
+          {showResult && (
+            <div className="space-y-3 mb-3">
+              <div className="bg-blue-900/30 border border-blue-500/50 rounded p-2">
+                <div className="text-xs text-blue-300 mb-1">Your Classification:</div>
+                <div className={`${userLabelObj?.color} text-white text-xs px-2 py-1 rounded inline-block`}>
+                  {userLabelObj?.label}
+                </div>
+              </div>
+              
+              {item.label ? (
+                <div className={`p-3 rounded ${showResult.correct ? 'bg-green-900/30 border border-green-500' : 'bg-red-900/30 border border-red-500'}`}>
+                  <div className="flex items-center gap-2 mb-2">
+                    {showResult.correct ? <Check size={16} className="text-green-400" /> : <X size={16} className="text-red-400" />}
+                    <span className="text-sm font-semibold">{showResult.correct ? 'Correct!' : 'Not quite'}</span>
+                  </div>
+                  <div className="text-xs mb-2">
+                    <span className="text-slate-300">NASA Catalog Label: </span>
+                    <span className={`${groundTruthLabel?.color} text-white px-2 py-0.5 rounded`}>
+                      {groundTruthLabel?.label}
+                    </span>
+                  </div>
+                  <div className="text-sm">{showResult.message}</div>
+                </div>
+              ) : (
+                <div className="bg-purple-900/30 border border-purple-500/50 rounded p-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Sparkles size={14} className="text-purple-400" />
+                    <span className="text-xs font-semibold text-purple-300">ML Prediction</span>
+                  </div>
+                  <div className="mb-2">
+                    <span className={`${mlLabel?.color} text-white text-xs px-2 py-1 rounded`}>
+                      {mlLabel?.label}
+                    </span>
+                    <span className="text-xs text-purple-300 ml-2">
+                      ({(mlPrediction.confidence * 100).toFixed(0)}% confidence)
+                    </span>
+                  </div>
+                  <div className="text-xs text-slate-300 mb-2">{mlPrediction.explanation}</div>
+                  {userLabel === mlPrediction.prediction ? (
+                    <div className="text-xs text-green-400">✓ You agree with ML</div>
+                  ) : (
+                    <div className="text-xs text-orange-400">⚠ You disagree with ML</div>
+                  )}
+                  {showResult.message && (
+                    <div className="text-sm mt-2 text-slate-200">{showResult.message}</div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+          
+          {!isLabeled ? (
+            <div className="flex flex-wrap gap-2">
+              {LABEL_OPTIONS.map(option => (
+                <button
+                  key={option.value}
+                  onClick={() => onLabel(option.value)}
+                  className={`${option.color} hover:opacity-80 text-white text-xs px-3 py-2 rounded transition-all`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <button
+                onClick={onChat}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white text-sm px-4 py-2 rounded flex items-center justify-center gap-2 transition-all"
+              >
+                <MessageSquare size={16} />
+                I'm not convinced - Discuss
+              </button>
+            </div>
+          )}
+        </div>
+      );
+    };
+
+    const ChatModal = ({ item, userLabel, mlPrediction, onClose, onUpdateLabel }) => {
+      const [messages, setMessages] = useState([]);
+      const [input, setInput] = useState('');
+      const messagesEndRef = useRef(null);
+      const conversationId = `conv:${item.id}:user:${Date.now()}`;
+      
+      useEffect(() => {
+        const saved = localStorage.getItem(conversationId);
+        if (saved) {
+          setMessages(JSON.parse(saved));
+        } else {
+          const systemMsg = {
+            role: 'assistant',
+            content: generateChatResponse(item, userLabel, mlPrediction, []),
+            timestamp: new Date().toISOString()
+          };
+          setMessages([systemMsg]);
+          localStorage.setItem(conversationId, JSON.stringify([systemMsg]));
+        }
+      }, []);
+      
+      useEffect(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, [messages]);
+      
+      const handleSend = () => {
+        if (!input.trim()) return;
+        
+        const userMsg = {
+          role: 'user',
+          content: input,
+          timestamp: new Date().toISOString()
+        };
+        
+        const assistantMsg = {
+          role: 'assistant',
+          content: generateChatResponse(item, userLabel, mlPrediction, [...messages, userMsg]),
+          timestamp: new Date().toISOString()
+        };
+        
+        const newMessages = [...messages, userMsg, assistantMsg];
+        setMessages(newMessages);
+        localStorage.setItem(conversationId, JSON.stringify(newMessages));
+        setInput('');
+      };
+      
+      return (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-800 rounded-lg shadow-2xl w-full max-w-4xl h-[600px] flex flex-col">
+            <div className="p-4 border-b border-slate-700 flex justify-between items-center">
+              <div>
+                <h2 className="text-lg font-bold">Discussion: {item.id}</h2>
+                <p className="text-xs text-slate-400">Let's examine the evidence together</p>
+              </div>
+              <button onClick={onClose} className="text-slate-400 hover:text-white">
+                <X size={24} />
+              </button>
+            </div>
+            
+            <div className="flex-1 flex overflow-hidden">
+              <div className="w-1/3 border-r border-slate-700 p-4 overflow-y-auto">
+                <h3 className="text-sm font-semibold mb-2">Item Context</h3>
+                <LightCurveChart data={item.flux} />
+                <div className="mt-3 space-y-1 text-xs">
+                  <div><span className="text-slate-400">Period:</span> {item.metadata.period_days?.toFixed(2) || 'Unknown'} days</div>
+                  <div><span className="text-slate-400">Depth:</span> {(item.metadata.depth_fraction * 100).toFixed(2)}%</div>
+                  <div><span className="text-slate-400">Duration:</span> {item.metadata.duration_hours.toFixed(1)}h</div>
+                  <div><span className="text-slate-400">SNR:</span> {item.metadata.snr.toFixed(1)}</div>
+                  <div><span className="text-slate-400">Shape:</span> {item.metadata.shape}</div>
+                </div>
+                {mlPrediction && (
+                  <div className="mt-3 bg-purple-900/30 p-2 rounded">
+                    <div className="text-xs font-semibold text-purple-300">ML says:</div>
+                    <div className="text-sm text-purple-200">{mlPrediction.prediction}</div>
+                    <div className="text-xs text-purple-300">{(mlPrediction.confidence * 100).toFixed(0)}% confident</div>
+                  </div>
+                )}
+                <div className="mt-3 bg-blue-900/30 p-2 rounded">
+                  <div className="text-xs font-semibold text-blue-300">You chose:</div>
+                  <div className="text-sm text-blue-200">{userLabel}</div>
+                </div>
+              </div>
+              
+              <div className="flex-1 flex flex-col">
+                <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                  {messages.map((msg, idx) => (
+                    <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                      <div className={`max-w-[80%] p-3 rounded-lg ${msg.role === 'user' ? 'bg-blue-600' : 'bg-slate-700'}`}>
+                        <div className="text-sm whitespace-pre-wrap">{msg.content}</div>
+                      </div>
+                    </div>
+                  ))}
+                  <div ref={messagesEndRef} />
+                </div>
+                
+                <div className="p-4 border-t border-slate-700">
+                  <div className="flex gap-2 mb-3">
+                    <input
+                      type="text"
+                      value={input}
+                      onChange={(e) => setInput(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && handleSend()}
+                      placeholder="Share your thoughts..."
+                      className="flex-1 bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
+                    />
+                    <button
+                      onClick={handleSend}
+                      className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded text-sm font-medium transition-all"
+                    >
+                      Send
+                    </button>
+                  </div>
+                  
+                  <div className="flex gap-2">
+                    {mlPrediction && (
+                      <button
+                        onClick={() => onUpdateLabel(mlPrediction.prediction)}
+                        className="flex-1 bg-purple-600 hover:bg-purple-700 px-3 py-2 rounded text-xs transition-all"
+                      >
+                        Accept ML
+                      </button>
+                    )}
+                    <button
+                      onClick={onClose}
+                      className="flex-1 bg-slate-600 hover:bg-slate-700 px-3 py-2 rounded text-xs transition-all"
+                    >
+                      Keep My Label
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    const SettingsModal = ({ config, onUpdate, onClose }) => {
+      const [local, setLocal] = useState(config);
+      
+      return (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-800 rounded-lg shadow-2xl w-full max-w-md">
+            <div className="p-4 border-b border-slate-700 flex justify-between items-center">
+              <h2 className="text-lg font-bold">Configuration</h2>
+              <button onClick={onClose} className="text-slate-400 hover:text-white">
+                <X size={24} />
+              </button>
+            </div>
+            
+            <div className="p-4 space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">User Trust Threshold</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  value={local.userTrustThreshold}
+                  onChange={(e) => setLocal({...local, userTrustThreshold: parseFloat(e.target.value)})}
+                  className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm"
+                />
+                <p className="text-xs text-slate-400 mt-1">Min accuracy to become trusted (default: 0.85)</p>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-1">High Trust Threshold</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  value={local.userTrustThresholdHigh}
+                  onChange={(e) => setLocal({...local, userTrustThresholdHigh: parseFloat(e.target.value)})}
+                  className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm"
+                />
+                <p className="text-xs text-slate-400 mt-1">Single user can set facts (default: 0.90)</p>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-1">Min Agreeing Users</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="10"
+                  value={local.minAgreeingUsers}
+                  onChange={(e) => setLocal({...local, minAgreeingUsers: parseInt(e.target.value)})}
+                  className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm"
+                />
+                <p className="text-xs text-slate-400 mt-1">Users needed to agree for consensus (default: 3)</p>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-1">ML Confidence Warning</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  value={local.mlConfidenceWarning}
+                  onChange={(e) => setLocal({...local, mlConfidenceWarning: parseFloat(e.target.value)})}
+                  className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm"
+                />
+                <p className="text-xs text-slate-400 mt-1">Show warning if ML confidence below this (default: 0.60)</p>
+              </div>
+            </div>
+            
+            <div className="p-4 border-t border-slate-700 flex gap-2">
+              <button
+                onClick={() => {
+                  onUpdate(local);
+                  onClose();
+                }}
+                className="flex-1 bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded transition-all"
+              >
+                Save Changes
+              </button>
+              <button
+                onClick={onClose}
+                className="flex-1 bg-slate-600 hover:bg-slate-700 px-4 py-2 rounded transition-all"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // ==================== MAIN APP ====================
+
+    function ExoplanetHunter() {
+      const [items] = useState(() => generateSampleData());
+      const [userLabels, setUserLabels] = useState(() => {
+        const saved = localStorage.getItem('userLabels');
+        return saved ? JSON.parse(saved) : {};
+      });
+      const [accuracy, setAccuracy] = useState({ correct: 0, total: 0 });
+      const [chatItem, setChatItem] = useState(null);
+      const [showSettings, setShowSettings] = useState(false);
+      const [config, setConfig] = useState(() => {
+        const saved = localStorage.getItem('config');
+        return saved ? JSON.parse(saved) : {
+          userTrustThreshold: 0.85,
+          userTrustThresholdHigh: 0.90,
+          minAgreeingUsers: 3,
+          mlConfidenceWarning: 0.60
+        };
+      });
+      const [results, setResults] = useState({});
+      
+      useEffect(() => {
+        localStorage.setItem('userLabels', JSON.stringify(userLabels));
+      }, [userLabels]);
+      
+      useEffect(() => {
+        localStorage.setItem('config', JSON.stringify(config));
+      }, [config]);
+      
+      const handleLabel = (itemId, label) => {
+        const item = items.find(i => i.id === itemId);
+        const newLabels = { ...userLabels, [itemId]: label };
+        setUserLabels(newLabels);
+        
+        if (item.label) {
+          const isCorrect = item.label === label;
+          const newAccuracy = {
+            correct: accuracy.correct + (isCorrect ? 1 : 0),
+            total: accuracy.total + 1
+          };
+          setAccuracy(newAccuracy);
+          
+          const message = isCorrect 
+            ? "Nice — that matches the catalog. Good eye!"
+            : generateEducationalFeedback(item, label, item.label);
+          
+          setResults({
+            ...results,
+            [itemId]: { correct: isCorrect, message }
+          });
+        } else {
+          const userAccuracyRate = accuracy.total > 0 ? accuracy.correct / accuracy.total : 0;
+          const isTrusted = userAccuracyRate >= config.userTrustThreshold;
+          
+          if (isTrusted) {
+            setResults({
+              ...results,
+              [itemId]: {
+                correct: true,
+                message: `Your label has been recorded as a candidate fact (accuracy: ${(userAccuracyRate * 100).toFixed(0)}%). Thank you for contributing!`
+              }
+            });
+          } else {
+            setResults({
+              ...results,
+              [itemId]: { correct: true, message: '' }
+            });
+          }
+        }
+      };
+      
+      const handleUpdateLabel = (itemId, newLabel) => {
+        handleLabel(itemId, newLabel);
+        setChatItem(null);
+      };
+      
+      const handleExport = () => {
+        const exportData = {
+          labels: userLabels,
+          accuracy,
+          config,
+          timestamp: new Date().toISOString(),
+          conversations: Object.keys(localStorage)
+            .filter(key => key.startsWith('conv:'))
+            .map(key => ({ id: key, messages: JSON.parse(localStorage.getItem(key)) }))
+        };
+        
+        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `exoplanet-labels-${Date.now()}.json`;
+        a.click();
+      };
+      
+      const userAccuracyRate = accuracy.total > 0 ? accuracy.correct / accuracy.total : 0;
+      const isTrusted = userAccuracyRate >= config.userTrustThreshold;
+      
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 text-white">
+          <div className="container mx-auto px-4 py-6">
+            <header className="mb-6">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h1 className="text-3xl font-bold mb-1">🔭 Exoplanet Hunter</h1>
+                  <p className="text-slate-300">Help discover new worlds through citizen science</p>
+                </div>
+                
+                <div className="flex items-center gap-4">
+                  <div className="bg-slate-800 rounded-lg px-4 py-2 border border-slate-700">
+                    <div className="text-xs text-slate-400">Your Accuracy</div>
+                    <div className="flex items-center gap-2">
+                      <TrendingUp size={20} className={isTrusted ? 'text-green-400' : 'text-blue-400'} />
+                      <span className="text-2xl font-bold">
+                        {accuracy.total > 0 ? `${(userAccuracyRate * 100).toFixed(0)}%` : '--'}
+                      </span>
+                      <span className="text-sm text-slate-400">({accuracy.correct}/{accuracy.total})</span>
+                    </div>
+                    {isTrusted && (
+                      <div className="text-xs text-green-400 mt-1">✓ Trusted Contributor</div>
+                    )}
+                  </div>
+                  
+                  <button
+                    onClick={() => setShowSettings(true)}
+                    className="bg-slate-700 hover:bg-slate-600 p-3 rounded-lg transition-all"
+                  >
+                    <Settings size={20} />
+                  </button>
+                  
+                  <button
+                    onClick={handleExport}
+                    className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg flex items-center gap-2 transition-all"
+                  >
+                    <Download size={20} />
+                    Export
+                  </button>
+                </div>
+              </div>
+            </header>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {items.map(item => {
+                const mlPrediction = !item.label ? generateMLPrediction(item) : null;
+                const userLabel = userLabels[item.id];
+                const result = results[item.id];
+                
+                return (
+                  <ItemCard
+                    key={item.id}
+                    item={item}
+                    userLabel={userLabel}
+                    mlPrediction={mlPrediction}
+                    showResult={result}
+                    isLabeled={!!userLabel}
+                    onLabel={(label) => handleLabel(item.id, label)}
+                    onChat={() => setChatItem({ item, userLabel, mlPrediction })}
+                  />
+                );
+              })}
+            </div>
+            
+            {chatItem && (
+              <ChatModal
+                item={chatItem.item}
+                userLabel={chatItem.userLabel}
+                mlPrediction={chatItem.mlPrediction}
+                onClose={() => setChatItem(null)}
+                onUpdateLabel={(label) => handleUpdateLabel(chatItem.item.id, label)}
+              />
+            )}
+            
+            {showSettings && (
+              <SettingsModal
+                config={config}
+                onUpdate={setConfig}
+                onClose={() => setShowSettings(false)}
+              />
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // Render the app
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<ExoplanetHunter />);
+  </script>
+</body>
+</html>
